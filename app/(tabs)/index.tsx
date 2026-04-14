@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>PWA Rotas 🚀</Text>
-      <Text style={styles.subtitle}>Seu app de rotas está começando!</Text>
+      <Text style={styles.subtitle}>Seu app de rotas está começando 🚀🔥</Text>
 
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>Buscar Rota</Text>
