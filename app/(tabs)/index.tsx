@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   StyleSheet,
@@ -10,6 +11,17 @@ import {
 export default function Home() {
   const [origem, setOrigem] = useState("");
   const [destino, setDestino] = useState("");
+
+  const router = useRouter();
+
+  function calcularRota() {
+    if (!origem || !destino) {
+      alert("Preencha origem e destino");
+      return;
+    }
+
+    router.push("/(tabs)/MapScreen" as any);
+  }
 
   return (
     <View style={styles.container}>
@@ -29,7 +41,7 @@ export default function Home() {
         onChangeText={setDestino}
       />
 
-      <TouchableOpacity style={styles.button}>
+      <TouchableOpacity style={styles.button} onPress={calcularRota}>
         <Text style={styles.buttonText}>Calcular Rota</Text>
       </TouchableOpacity>
     </View>
