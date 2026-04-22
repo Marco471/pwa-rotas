@@ -1,8 +1,19 @@
-import axios from "axios";
+import polyline from "@mapbox/polyline";
 import * as Location from "expo-location";
-import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Button, StyleSheet, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
+
+const TOKEN = "AIzaSyCZY7og4lQFabtwv14BmU-b1WXbOPhT_Kw";
 
 type Coord = {
   latitude: number;
@@ -10,180 +21,283 @@ type Coord = {
 };
 
 export default function MapScreen() {
-  const [location, setLocation] =
-    useState<Location.LocationObjectCoords | null>(null);
-  const [destination, setDestination] = useState("");
-  const [routeCoords, setRouteCoords] = useState<Coord[]>([]);
+  const mapRef = useRef<MapView>(null);
 
-  const API_KEY =
-    "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjEyMTRiNjQxOWFmNzQ3NWNhOTg0YjIxZTZhZTJlY2VmIiwiaCI6Im11cm11cjY0In0="; //
+  const [location, setLocation] = useState<Coord | null>(null);
+  const [origemCoords, setOrigemCoords] = useState<Coord | null>(null);
+  const [destinoCoords, setDestinoCoords] = useState<Coord | null>(null);
 
-  // 📍 Localização
+  const [origemText, setOrigemText] = useState("");
+  const [destinoText, setDestinoText] = useState("");
+
+  const [sugestoes, setSugestoes] = useState<any[]>([]);
+  const [rota, setRota] = useState<Coord[]>([]);
+  const [tempo, setTempo] = useState<number | null>(null);
+  const [distancia, setDistancia] = useState<number | null>(null);
+
+  const [campoAtivo, setCampoAtivo] = useState<"origem" | "destino">("destino");
+
+  // 📍 GPS
   useEffect(() => {
-    const getLocation = async () => {
+    (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
 
-      if (status !== "granted") {
-        Alert.alert("Permissão negada");
-        return;
-      }
+      const pos = await Location.getCurrentPositionAsync({});
 
-      const loc = await Location.getCurrentPositionAsync({});
-      setLocation(loc.coords);
-    };
+      const user = {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      };
 
-    getLocation();
+      setLocation(user);
+      setOrigemCoords(user);
+      setOrigemText("Minha localização");
+    })();
   }, []);
 
-  // 🚗 Buscar rota (PROFISSIONAL + PROTEGIDO)
-  const getRoute = useCallback(async () => {
-    if (!destination || !location) return;
+  // 🔍 AUTOCOMPLETE
+  const buscarSugestoes = async (texto: string) => {
+    if (!texto) return setSugestoes([]);
 
-    try {
-      // 🔎 GEOCODE
-      const geoResponse = await axios.get(
-        "https://api.openrouteservice.org/geocode/search",
-        {
-          params: {
-            api_key: API_KEY,
-            text: destination,
-            size: 1,
-          },
-        },
-      );
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+        texto,
+      )}&key=${TOKEN}&language=pt-BR&components=country:br`,
+    );
 
-      const features = geoResponse.data?.features;
+    const data = await res.json();
+    setSugestoes(data.predictions || []);
+  };
 
-      if (!features || features.length === 0) {
-        console.log("GEOCODE:", geoResponse.data);
-        Alert.alert("Destino não encontrado");
-        return;
-      }
+  // 📍 PLACE → COORD
+  const pegarCoords = async (placeId: string) => {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${TOKEN}`,
+    );
 
-      const coordsDestino = features[0]?.geometry?.coordinates;
+    const data = await res.json();
+    const loc = data.result.geometry.location;
 
-      if (!coordsDestino) {
-        Alert.alert("Erro nas coordenadas do destino");
-        return;
-      }
+    return {
+      latitude: loc.lat,
+      longitude: loc.lng,
+    };
+  };
 
-      // 🚗 DIRECTIONS (GEOJSON)
-      const routeResponse = await axios.post(
-        "https://api.openrouteservice.org/v2/directions/driving-car",
-        {
-          coordinates: [
-            [location.longitude, location.latitude],
-            [coordsDestino[0], coordsDestino[1]],
-          ],
-          format: "geojson",
-        },
-        {
-          headers: {
-            Authorization: API_KEY,
-            "Content-Type": "application/json",
-          },
-        },
-      );
+  // 🌍 TEXTO → COORD
+  const geocoding = async (endereco: string) => {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        endereco,
+      )}&key=${TOKEN}`,
+    );
 
-      const routeData = routeResponse.data;
+    const data = await res.json();
 
-      if (
-        !routeData ||
-        !routeData.features ||
-        routeData.features.length === 0
-      ) {
-        console.log("ROTA RESPONSE:", routeData);
-        Alert.alert("Erro na rota");
-        return;
-      }
+    if (data.status !== "OK") return null;
 
-      const coords = routeData.features[0]?.geometry?.coordinates;
+    const loc = data.results[0].geometry.location;
 
-      if (!coords) {
-        console.log("SEM COORDENADAS:", routeData);
-        Alert.alert("Erro ao processar rota");
-        return;
-      }
+    return {
+      latitude: loc.lat,
+      longitude: loc.lng,
+    };
+  };
 
-      const formatted: Coord[] = coords.map((c: number[]) => ({
-        latitude: c[1],
-        longitude: c[0],
+  // 🚗 ROTA
+  const calcularRota = async (origem: Coord, destino: Coord) => {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/directions/json?origin=${origem.latitude},${origem.longitude}&destination=${destino.latitude},${destino.longitude}&key=${TOKEN}`,
+    );
+
+    const data = await res.json();
+
+    if (data.status !== "OK") {
+      Alert.alert("Erro", "Não foi possível calcular rota");
+      return;
+    }
+
+    const route = data.routes[0];
+
+    setTempo(route.legs[0].duration.value);
+    setDistancia(route.legs[0].distance.value);
+
+    const pontos = polyline
+      .decode(route.overview_polyline.points)
+      .map((p: number[]) => ({
+        latitude: p[0],
+        longitude: p[1],
       }));
 
-      setRouteCoords(formatted);
-    } catch (error: any) {
-      console.log("ERRO COMPLETO:", error?.response?.data || error.message);
-      Alert.alert("Erro ao buscar rota");
-    }
-  }, [destination, location]);
+    setRota(pontos);
 
-  // 🔥 Busca automática
+    mapRef.current?.fitToCoordinates(pontos, {
+      edgePadding: { top: 100, right: 50, bottom: 200, left: 50 },
+      animated: true,
+    });
+  };
+
+  // 🔥 AUTO ATUALIZA ROTA (tipo Uber)
   useEffect(() => {
-    if (destination.length > 5 && location) {
-      const timeout = setTimeout(() => {
-        getRoute();
-      }, 1500);
+    const delay = setTimeout(async () => {
+      if (origemText && destinoText) {
+        const origem = await geocoding(origemText);
+        const destino = await geocoding(destinoText);
 
-      return () => clearTimeout(timeout);
-    }
-  }, [destination, location, getRoute]);
+        if (origem && destino) {
+          setOrigemCoords(origem);
+          setDestinoCoords(destino);
+          calcularRota(origem, destino);
+        }
+      }
+    }, 800); // debounce (espera parar de digitar)
 
-  if (!location) return null;
+    return () => clearTimeout(delay);
+  }, [origemText, destinoText]);
+
+  if (!location) return <ActivityIndicator size="large" />;
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1 }}>
       <MapView
-        style={styles.map}
-        region={{
+        ref={mapRef}
+        style={{ flex: 1 }}
+        initialRegion={{
           latitude: location.latitude,
           longitude: location.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
         }}
       >
         <Marker coordinate={location} title="Você" />
+        {origemCoords && <Marker coordinate={origemCoords} />}
+        {destinoCoords && <Marker coordinate={destinoCoords} />}
 
-        {routeCoords.length > 0 && (
-          <>
-            <Polyline coordinates={routeCoords} strokeWidth={4} />
-            <Marker
-              coordinate={routeCoords[routeCoords.length - 1]}
-              title="Destino"
-            />
-          </>
+        {rota.length > 0 && (
+          <Polyline coordinates={rota} strokeWidth={4} strokeColor="blue" />
         )}
       </MapView>
 
-      <View style={styles.inputContainer}>
+      <View style={{ position: "absolute", top: 40, width: "100%" }}>
         <TextInput
-          placeholder="Digite o destino"
-          value={destination}
-          onChangeText={setDestination}
+          placeholder="Origem"
+          value={origemText}
+          onFocus={() => setCampoAtivo("origem")}
+          onChangeText={(t) => {
+            setOrigemText(t);
+            setOrigemCoords(null);
+
+            // limpa rota
+            setRota([]);
+            setTempo(null);
+            setDistancia(null);
+
+            buscarSugestoes(t);
+          }}
           style={styles.input}
         />
 
-        {/* botão opcional */}
-        <Button title="Buscar rota" onPress={getRoute} />
+        <TextInput
+          placeholder="Destino"
+          value={destinoText}
+          onFocus={() => setCampoAtivo("destino")}
+          onChangeText={(t) => {
+            setDestinoText(t);
+            setDestinoCoords(null);
+
+            // limpa rota
+            setRota([]);
+            setTempo(null);
+            setDistancia(null);
+
+            buscarSugestoes(t);
+          }}
+          style={styles.input}
+        />
+
+        <TouchableOpacity
+          style={styles.botao}
+          onPress={async () => {
+            const origem = await geocoding(origemText);
+            const destino = await geocoding(destinoText);
+
+            if (!origem || !destino) {
+              Alert.alert("Erro", "Digite endereço válido");
+              return;
+            }
+
+            setOrigemCoords(origem);
+            setDestinoCoords(destino);
+
+            calcularRota(origem, destino);
+          }}
+        >
+          <Text style={styles.botaoTexto}>Calcular Rota</Text>
+        </TouchableOpacity>
       </View>
+
+      <ScrollView style={{ position: "absolute", top: 180, width: "100%" }}>
+        {sugestoes.map((item) => (
+          <TouchableOpacity
+            key={item.place_id}
+            onPress={async () => {
+              const coords = await pegarCoords(item.place_id);
+
+              if (campoAtivo === "origem") {
+                setOrigemCoords(coords);
+                setOrigemText(item.description);
+              } else {
+                setDestinoCoords(coords);
+                setDestinoText(item.description);
+              }
+
+              setSugestoes([]);
+            }}
+          >
+            <Text style={styles.sugestao}>{item.description}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {tempo && distancia && (
+        <View style={styles.info}>
+          <Text>⏱ {Math.round(tempo / 60)} min</Text>
+          <Text>📏 {(distancia / 1000).toFixed(2)} km</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { flex: 1 },
-  inputContainer: {
+  input: {
+    backgroundColor: "#fff",
+    padding: 10,
+    margin: 5,
+    borderRadius: 8,
+  },
+  sugestao: {
+    padding: 10,
+    backgroundColor: "#eee",
+  },
+  info: {
     position: "absolute",
     bottom: 20,
-    left: 10,
-    right: 10,
+    alignSelf: "center",
     backgroundColor: "#fff",
     padding: 10,
     borderRadius: 10,
   },
-  input: {
-    borderBottomWidth: 1,
-    marginBottom: 10,
-    padding: 5,
+  botao: {
+    backgroundColor: "#000",
+    padding: 12,
+    margin: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  botaoTexto: {
+    color: "#fff",
+    fontWeight: "bold",
   },
 });
