@@ -3,74 +3,88 @@ import * as Location from "expo-location";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  ScrollView,
+  FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
 import MapView, { Marker, Polyline } from "react-native-maps";
 
-const TOKEN = "AIzaSyCZY7og4lQFabtwv14BmU-b1WXbOPhT_Kw";
+// ⚠️ COLOQUE SUA CHAVE COMPLETA AQUI
+const TOKEN = "AIzaSyAK6k7lAFnl4NS4WVgRJ6Fl4Gnzx5ZLUKM";
 
 type Coord = {
   latitude: number;
   longitude: number;
 };
 
+type Campo = "origem" | "destino" | "parada";
+
 export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
 
   const [location, setLocation] = useState<Coord | null>(null);
-  const [origemCoords, setOrigemCoords] = useState<Coord | null>(null);
-  const [destinoCoords, setDestinoCoords] = useState<Coord | null>(null);
+
+  const [origem, setOrigem] = useState<Coord | null>(null);
+  const [destino, setDestino] = useState<Coord | null>(null);
 
   const [origemText, setOrigemText] = useState("");
   const [destinoText, setDestinoText] = useState("");
+  const [paradaText, setParadaText] = useState("");
 
+  const [paradas, setParadas] = useState<Coord[]>([]);
   const [sugestoes, setSugestoes] = useState<any[]>([]);
+  const [campoAtivo, setCampoAtivo] = useState<Campo>("destino");
+
   const [rota, setRota] = useState<Coord[]>([]);
-  const [tempo, setTempo] = useState<number | null>(null);
-  const [distancia, setDistancia] = useState<number | null>(null);
+  const [preco, setPreco] = useState<number | null>(null);
 
-  const [campoAtivo, setCampoAtivo] = useState<"origem" | "destino">("destino");
-
-  // 📍 GPS
+  // ================= GPS =================
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
 
       const pos = await Location.getCurrentPositionAsync({});
-
       const user = {
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
       };
 
       setLocation(user);
-      setOrigemCoords(user);
-      setOrigemText("Minha localização");
+      setOrigem(user);
     })();
   }, []);
 
-  // 🔍 AUTOCOMPLETE
-  const buscarSugestoes = async (texto: string) => {
-    if (!texto) return setSugestoes([]);
+  // ================= AUTOCOMPLETE =================
+  const buscar = async (texto: string, campo: Campo) => {
+    if (!texto || texto.length < 2) return setSugestoes([]);
 
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-        texto,
-      )}&key=${TOKEN}&language=pt-BR&components=country:br`,
-    );
+    setCampoAtivo(campo);
 
-    const data = await res.json();
-    setSugestoes(data.predictions || []);
+    try {
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${texto}&key=${TOKEN}&language=pt-BR`,
+      );
+
+      const data = await res.json();
+
+      if (data.status !== "OK") {
+        setSugestoes([]);
+        return;
+      }
+
+      setSugestoes(data.predictions || []);
+    } catch (err) {
+      console.log(err);
+    }
   };
 
-  // 📍 PLACE → COORD
+  // ================= COORDENADAS =================
   const pegarCoords = async (placeId: string) => {
     const res = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${TOKEN}`,
@@ -85,81 +99,67 @@ export default function MapScreen() {
     };
   };
 
-  // 🌍 TEXTO → COORD
-  const geocoding = async (endereco: string) => {
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-        endereco,
-      )}&key=${TOKEN}`,
-    );
+  // ================= PREÇO =================
+  const calcularPreco = (data: any) => {
+    const km =
+      data.routes[0].legs.reduce((acc: number, leg: any) => {
+        return acc + leg.distance.value;
+      }, 0) / 1000;
 
-    const data = await res.json();
-
-    if (data.status !== "OK") return null;
-
-    const loc = data.results[0].geometry.location;
-
-    return {
-      latitude: loc.lat,
-      longitude: loc.lng,
-    };
+    setPreco(km * 2.5);
   };
 
-  // 🚗 ROTA
-  const calcularRota = async (origem: Coord, destino: Coord) => {
+  // ================= ROTA =================
+  const calcularRota = async () => {
+    if (!origem || !destino) return;
+
+    const waypoints =
+      paradas.length > 0
+        ? `&waypoints=${paradas
+            .map((p) => `${p.latitude},${p.longitude}`)
+            .join("|")}`
+        : "";
+
     const res = await fetch(
-      `https://maps.googleapis.com/maps/api/directions/json?origin=${origem.latitude},${origem.longitude}&destination=${destino.latitude},${destino.longitude}&key=${TOKEN}`,
+      `https://maps.googleapis.com/maps/api/directions/json?origin=${origem.latitude},${origem.longitude}&destination=${destino.latitude},${destino.longitude}${waypoints}&key=${TOKEN}`,
     );
 
     const data = await res.json();
 
-    if (data.status !== "OK") {
-      Alert.alert("Erro", "Não foi possível calcular rota");
-      return;
-    }
-
-    const route = data.routes[0];
-
-    setTempo(route.legs[0].duration.value);
-    setDistancia(route.legs[0].distance.value);
+    if (data.status !== "OK") return;
 
     const pontos = polyline
-      .decode(route.overview_polyline.points)
+      .decode(data.routes[0].overview_polyline.points)
       .map((p: number[]) => ({
         latitude: p[0],
         longitude: p[1],
       }));
 
     setRota(pontos);
-
-    mapRef.current?.fitToCoordinates(pontos, {
-      edgePadding: { top: 100, right: 50, bottom: 200, left: 50 },
-      animated: true,
-    });
+    calcularPreco(data);
   };
 
-  // 🔥 AUTO ATUALIZA ROTA (tipo Uber)
-  useEffect(() => {
-    const delay = setTimeout(async () => {
-      if (origemText && destinoText) {
-        const origem = await geocoding(origemText);
-        const destino = await geocoding(destinoText);
+  // ================= LIMPAR TUDO =================
+  const limparTudo = () => {
+    setOrigem(null);
+    setDestino(null);
+    setParadas([]);
 
-        if (origem && destino) {
-          setOrigemCoords(origem);
-          setDestinoCoords(destino);
-          calcularRota(origem, destino);
-        }
-      }
-    }, 800); // debounce (espera parar de digitar)
+    setOrigemText("");
+    setDestinoText("");
+    setParadaText("");
 
-    return () => clearTimeout(delay);
-  }, [origemText, destinoText]);
+    setRota([]); // 🔥 remove linha do mapa
+    setPreco(null);
+
+    setSugestoes([]);
+  };
 
   if (!location) return <ActivityIndicator size="large" />;
 
   return (
     <View style={{ flex: 1 }}>
+      {/* MAPA */}
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
@@ -170,30 +170,27 @@ export default function MapScreen() {
           longitudeDelta: 0.05,
         }}
       >
-        <Marker coordinate={location} title="Você" />
-        {origemCoords && <Marker coordinate={origemCoords} />}
-        {destinoCoords && <Marker coordinate={destinoCoords} />}
+        {origem && <Marker coordinate={origem} pinColor="green" />}
+        {destino && <Marker coordinate={destino} pinColor="red" />}
+
+        {paradas.map((p, i) => (
+          <Marker key={i} coordinate={p} pinColor="orange" />
+        ))}
 
         {rota.length > 0 && (
           <Polyline coordinates={rota} strokeWidth={4} strokeColor="blue" />
         )}
       </MapView>
 
-      <View style={{ position: "absolute", top: 40, width: "100%" }}>
+      {/* INPUTS */}
+      <View style={styles.top}>
         <TextInput
           placeholder="Origem"
           value={origemText}
           onFocus={() => setCampoAtivo("origem")}
           onChangeText={(t) => {
             setOrigemText(t);
-            setOrigemCoords(null);
-
-            // limpa rota
-            setRota([]);
-            setTempo(null);
-            setDistancia(null);
-
-            buscarSugestoes(t);
+            buscar(t, "origem");
           }}
           style={styles.input}
         />
@@ -204,100 +201,137 @@ export default function MapScreen() {
           onFocus={() => setCampoAtivo("destino")}
           onChangeText={(t) => {
             setDestinoText(t);
-            setDestinoCoords(null);
-
-            // limpa rota
-            setRota([]);
-            setTempo(null);
-            setDistancia(null);
-
-            buscarSugestoes(t);
+            buscar(t, "destino");
           }}
           style={styles.input}
         />
 
-        <TouchableOpacity
-          style={styles.botao}
-          onPress={async () => {
-            const origem = await geocoding(origemText);
-            const destino = await geocoding(destinoText);
-
-            if (!origem || !destino) {
-              Alert.alert("Erro", "Digite endereço válido");
-              return;
-            }
-
-            setOrigemCoords(origem);
-            setDestinoCoords(destino);
-
-            calcularRota(origem, destino);
+        <TextInput
+          placeholder="Adicionar parada"
+          value={paradaText}
+          onFocus={() => setCampoAtivo("parada")}
+          onChangeText={(t) => {
+            setParadaText(t);
+            buscar(t, "parada");
           }}
-        >
-          <Text style={styles.botaoTexto}>Calcular Rota</Text>
+          style={styles.input}
+        />
+
+        {/* PARADAS */}
+        {paradas.map((p, index) => (
+          <View key={index} style={styles.paradaItem}>
+            <Text style={{ flex: 1 }}>Parada {index + 1}</Text>
+
+            <Pressable
+              onPress={() => {
+                setParadas(paradas.filter((_, i) => i !== index));
+              }}
+            >
+              <Text style={{ color: "red", fontWeight: "bold" }}>X</Text>
+            </Pressable>
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.botao} onPress={calcularRota}>
+          <Text style={{ color: "#fff" }}>Calcular Rota</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.botao} onPress={limparTudo}>
+          <Text style={{ color: "#fff" }}>Limpar Tudo</Text>
+        </TouchableOpacity>
+
+        {preco !== null && (
+          <Text style={styles.preco}>Preço: R$ {preco.toFixed(2)}</Text>
+        )}
       </View>
 
-      <ScrollView style={{ position: "absolute", top: 180, width: "100%" }}>
-        {sugestoes.map((item) => (
+      {/* SUGESTÕES */}
+      <FlatList
+        style={styles.lista}
+        data={sugestoes}
+        keyExtractor={(item) => item.place_id}
+        renderItem={({ item }) => (
           <TouchableOpacity
-            key={item.place_id}
             onPress={async () => {
               const coords = await pegarCoords(item.place_id);
 
               if (campoAtivo === "origem") {
-                setOrigemCoords(coords);
+                setOrigem(coords);
                 setOrigemText(item.description);
-              } else {
-                setDestinoCoords(coords);
+              }
+
+              if (campoAtivo === "destino") {
+                setDestino(coords);
                 setDestinoText(item.description);
+              }
+
+              if (campoAtivo === "parada") {
+                setParadas((prev) => [...prev, coords]);
+                setParadaText("");
               }
 
               setSugestoes([]);
             }}
           >
-            <Text style={styles.sugestao}>{item.description}</Text>
+            <Text style={styles.item}>{item.description}</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {tempo && distancia && (
-        <View style={styles.info}>
-          <Text>⏱ {Math.round(tempo / 60)} min</Text>
-          <Text>📏 {(distancia / 1000).toFixed(2)} km</Text>
-        </View>
-      )}
+        )}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  top: {
+    position: "absolute",
+    top: 40,
+    width: "100%",
+  },
+
   input: {
     backgroundColor: "#fff",
-    padding: 10,
     margin: 5,
+    padding: 10,
     borderRadius: 8,
   },
-  sugestao: {
-    padding: 10,
-    backgroundColor: "#eee",
-  },
-  info: {
+
+  lista: {
     position: "absolute",
-    bottom: 20,
-    alignSelf: "center",
+    top: 180,
+    width: "100%",
     backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 10,
+    maxHeight: 200,
   },
+
+  item: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+  },
+
   botao: {
     backgroundColor: "#000",
-    padding: 12,
     margin: 10,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 8,
     alignItems: "center",
   },
-  botaoTexto: {
-    color: "#fff",
+
+  preco: {
+    textAlign: "center",
+    fontSize: 18,
     fontWeight: "bold",
+    marginTop: 5,
+    color: "#000",
+  },
+
+  paradaItem: {
+    flexDirection: "row",
+    backgroundColor: "#eee",
+    marginHorizontal: 10,
+    marginTop: 5,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
   },
 });
