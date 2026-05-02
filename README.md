@@ -5,32 +5,33 @@ Aplicativo mobile de rotas com mapa, GPS e navegação em tempo real, desenvolvi
 ---
 
 ## 🚀 Tecnologias
-- Expo
-- React Native
-- react-native-maps
-- Expo Location
-- Polyline
+- Expo  
+- React Native  
+- react-native-maps  
+- Expo Location  
+- Polyline  
 
 ---
 
 ## 📱 Funcionalidades
-- Definir endereço de origem e destino
-- Traçar rota no mapa em tempo real
-- Adicionar paradas intermediárias
-- Reset completo do mapa
-- Limpeza de inputs
-- Atualização dinâmica da rota
+- Definir endereço de origem e destino  
+- Traçar rota no mapa em tempo real  
+- Adicionar paradas intermediárias  
+- Reset completo do mapa  
+- Limpeza de inputs  
+- Atualização dinâmica da rota  
+
+---
+
+## 🧠 Objetivo do projeto
+
+Este projeto foi criado para praticar integração com mapas, GPS e manipulação de rotas em aplicações mobile usando React Native.
 
 ---
 
 ## 📸 Demonstração
 
-![demo](./assets/images/demo.gif)
+> Adicione aqui um GIF do app funcionando
 
----
-
-## ▶️ Como rodar
-
-```bash
-npm install
-npx expo start
+```md
+./assets/images/demo.gif
