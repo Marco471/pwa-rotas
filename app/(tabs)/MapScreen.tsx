@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Keyboard,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -42,6 +43,7 @@ export default function MapScreen() {
   const [rota, setRota] = useState<Coord[]>([]);
   const [preco, setPreco] = useState<number | null>(null);
 
+  // 📍 localização
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -59,6 +61,15 @@ export default function MapScreen() {
     })();
   }, []);
 
+  if (Platform.OS === "web") {
+    return (
+      <View style={styles.web}>
+        <Text style={styles.webText}>🚫 Mapa não disponível na web</Text>
+      </View>
+    );
+  }
+
+  // 🔎 busca endereço
   const buscar = async (texto: string, campo: Campo) => {
     if (!texto || texto.length < 2) {
       setSugestoes([]);
@@ -73,16 +84,13 @@ export default function MapScreen() {
       const res = await fetch(url);
       const data = await res.json();
 
-      if (data.status === "OK") {
-        setSugestoes(data.predictions);
-      } else {
-        setSugestoes([]);
-      }
+      setSugestoes(data.status === "OK" ? data.predictions : []);
     } catch {
       Alert.alert("Erro", "Falha ao buscar endereço");
     }
   };
 
+  // 📍 coords
   const pegarCoords = async (placeId: string): Promise<Coord> => {
     const res = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${TOKEN}`,
@@ -96,6 +104,7 @@ export default function MapScreen() {
     };
   };
 
+  // 🛣️ rota
   const calcularRota = async () => {
     if (!origem || !destino) {
       Alert.alert("Erro", "Selecione origem e destino");
@@ -125,9 +134,10 @@ export default function MapScreen() {
         .map((p: number[]) => ({
           latitude: p[0],
           longitude: p[1],
-        }));
+        }))
+        .filter((p) => p.latitude && p.longitude);
 
-      setRota(pontos);
+      setRota([...pontos]);
 
       const km =
         data.routes[0].legs.reduce((acc: number, leg: any) => {
@@ -137,7 +147,7 @@ export default function MapScreen() {
       setPreco(km * 2.5);
 
       mapRef.current?.fitToCoordinates(pontos, {
-        edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
+        edgePadding: { top: 120, right: 50, bottom: 200, left: 50 },
         animated: true,
       });
     } catch {
@@ -147,6 +157,7 @@ export default function MapScreen() {
 
   if (!location) return <ActivityIndicator size="large" />;
 
+  // ❌ LIMPAR TOTAL (CORRIGIDO)
   function limparInput(tipo: Campo) {
     if (tipo === "origem") {
       setOrigemText("");
@@ -160,11 +171,12 @@ export default function MapScreen() {
 
     if (tipo === "parada") {
       setParadaText("");
-      setParadas([]); // 🔥 limpa paradas
+      setParadas([]);
     }
 
-    setRota([]); // 🔥 limpa rota
-    setPreco(null); // 🔥 limpa preço
+    // 🔥 ESSA É A CORREÇÃO PRINCIPAL
+    setRota([]);
+    setPreco(null);
     setSugestoes([]);
   }
 
@@ -187,74 +199,60 @@ export default function MapScreen() {
           <Marker key={i} coordinate={p.coord} pinColor="orange" />
         ))}
 
-        {rota.length > 0 && (
-          <Polyline coordinates={rota} strokeWidth={4} strokeColor="blue" />
+        {/* 🔥 LINHA FIXA */}
+        {rota.length > 1 && (
+          <Polyline coordinates={rota} strokeWidth={5} strokeColor="#1e90ff" />
         )}
       </MapView>
 
       <View style={styles.card}>
-        {/* ORIGEM */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder="Origem"
-            value={origemText}
-            onFocus={() => setCampoAtivo("origem")}
-            onChangeText={(t) => {
-              setOrigemText(t);
-              setRota([]);
-              setPreco(null);
-              buscar(t, "origem");
-            }}
-            style={styles.input}
-          />
-          {origemText.length > 0 && (
-            <TouchableOpacity onPress={() => limparInput("origem")}>
-              <Text style={styles.clear}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TextInput
+          placeholder="Origem"
+          value={origemText}
+          onFocus={() => setCampoAtivo("origem")}
+          onChangeText={(t) => {
+            setOrigemText(t);
+            buscar(t, "origem");
+          }}
+          style={styles.input}
+        />
+        {origemText.length > 0 && (
+          <TouchableOpacity onPress={() => limparInput("origem")}>
+            <Text style={styles.clear}>✕</Text>
+          </TouchableOpacity>
+        )}
 
-        {/* DESTINO */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder="Destino"
-            value={destinoText}
-            onFocus={() => setCampoAtivo("destino")}
-            onChangeText={(t) => {
-              setDestinoText(t);
-              setRota([]);
-              setPreco(null);
-              buscar(t, "destino");
-            }}
-            style={styles.input}
-          />
-          {destinoText.length > 0 && (
-            <TouchableOpacity onPress={() => limparInput("destino")}>
-              <Text style={styles.clear}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TextInput
+          placeholder="Destino"
+          value={destinoText}
+          onFocus={() => setCampoAtivo("destino")}
+          onChangeText={(t) => {
+            setDestinoText(t);
+            buscar(t, "destino");
+          }}
+          style={styles.input}
+        />
+        {destinoText.length > 0 && (
+          <TouchableOpacity onPress={() => limparInput("destino")}>
+            <Text style={styles.clear}>✕</Text>
+          </TouchableOpacity>
+        )}
 
-        {/* PARADA */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder="Parada"
-            value={paradaText}
-            onFocus={() => setCampoAtivo("parada")}
-            onChangeText={(t) => {
-              setParadaText(t);
-              setRota([]);
-              setPreco(null);
-              buscar(t, "parada");
-            }}
-            style={styles.input}
-          />
-          {paradaText.length > 0 && (
-            <TouchableOpacity onPress={() => limparInput("parada")}>
-              <Text style={styles.clear}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TextInput
+          placeholder="Parada"
+          value={paradaText}
+          onFocus={() => setCampoAtivo("parada")}
+          onChangeText={(t) => {
+            setParadaText(t);
+            buscar(t, "parada");
+          }}
+          style={styles.input}
+        />
+        {paradaText.length > 0 && (
+          <TouchableOpacity onPress={() => limparInput("parada")}>
+            <Text style={styles.clear}>✕</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.botao} onPress={calcularRota}>
           <Text style={styles.botaoTexto}>Calcular Rota</Text>
@@ -288,8 +286,7 @@ export default function MapScreen() {
                   ...prev,
                   { coord: coords, nome: item.description },
                 ]);
-
-                setParadaText(item.description); // 🔥 AGORA FICA NO INPUT
+                setParadaText(item.description);
               }
 
               setSugestoes([]);
@@ -303,6 +300,8 @@ export default function MapScreen() {
     </View>
   );
 }
+
+/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -318,18 +317,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 15,
   },
 
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f1f1",
-    borderRadius: 8,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-  },
-
   input: {
-    flex: 1,
-    paddingVertical: 10,
+    backgroundColor: "#f1f1f1",
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 8,
   },
 
   clear: {
@@ -340,7 +332,7 @@ const styles = StyleSheet.create({
 
   lista: {
     position: "absolute",
-    bottom: 180,
+    bottom: 200,
     width: "100%",
     backgroundColor: "#fff",
     maxHeight: 200,
@@ -367,6 +359,17 @@ const styles = StyleSheet.create({
   preco: {
     textAlign: "center",
     marginTop: 10,
+    fontWeight: "bold",
+  },
+
+  web: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  webText: {
+    fontSize: 16,
     fontWeight: "bold",
   },
 });
