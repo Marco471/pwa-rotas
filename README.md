@@ -31,7 +31,4 @@ Este projeto foi criado para praticar integração com mapas, GPS e manipulaçã
 
 ## 📸 Demonstração
 
-> Adicione aqui um GIF do app funcionando
-
-```md
-./assets/images/demo.gif
+![Demo do App](./assets/images/demo.gif)
