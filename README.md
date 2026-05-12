@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 # 📍 PWA Rotas
 
 Aplicativo mobile de rotas com mapa, GPS e navegação em tempo real, desenvolvido com **Expo React Native**.
@@ -13,21 +5,23 @@ Aplicativo mobile de rotas com mapa, GPS e navegação em tempo real, desenvolvi
 ---
 
 ## 🚀 Tecnologias
-- Expo  
-- React Native  
-- react-native-maps  
-- Expo Location  
-- Polyline  
+
+- Expo
+- React Native
+- react-native-maps
+- Expo Location
+- Polyline
 
 ---
 
 ## 📱 Funcionalidades
-- Definir endereço de origem e destino  
-- Traçar rota no mapa em tempo real  
-- Adicionar paradas intermediárias  
-- Reset completo do mapa  
-- Limpeza de inputs  
-- Atualização dinâmica da rota  
+
+- Definir endereço de origem e destino
+- Traçar rota no mapa em tempo real
+- Adicionar paradas intermediárias
+- Reset completo do mapa
+- Limpeza de inputs
+- Atualização dinâmica da rota
 
 ---
 
@@ -38,8 +32,6 @@ Este projeto foi criado para praticar integração com mapas, GPS e manipulaçã
 ---
 
 ## 📸 Demonstração
-
-![Demo do App](./assets/images/demo.gif)
 
 <video src="https://github.com/Marco471/pwa-rotas/raw/main/WhatsAppVideo2026-05-11at23.17.02-ezgif.com-video-to-gif-converter.mp4" controls width="300"></video>
 
@@ -67,5 +59,4 @@ Depois escaneie o QR Code no Expo Go.
 ## 👨‍💻 Autor
 
 Desenvolvido por Marcos De Lima
-
 
