@@ -37,6 +37,8 @@ Este projeto foi criado para praticar integração com mapas, GPS e manipulaçã
 
 ![Demo do App](./assets/images/demo.gif)
 
+
+
 ---
 
 ## ▶️ Como rodar o projeto
