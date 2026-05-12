@@ -58,5 +58,6 @@ Depois escaneie o QR Code no Expo Go.
 
 ## 👨‍💻 Autor
 
-Desenvolvido por Marcos De Lima
+Desenvolvido por Marcos De Lima 
 
+<!-- update -->
