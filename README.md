@@ -38,32 +38,18 @@ Este projeto foi criado para praticar integração com mapas, GPS e manipulaçã
 ---
 
 ## 📸 Demonstração
-
 ![Demo do App](./assets/images/demo.gif)
+
 <video src="https://github.com/Marco471/pwa-rotas/raw/main/WhatsAppVideo2026-05-11at23.17.02-ezgif.com-video-to-gif-converter.mp4" controls width="300"></video>
-
-
----
 
 ## ▶️ Como rodar o projeto
 
 ```bash
 npm install
 npx expo start
-```
+Depois:
+1. Clique em **Edit** ✏️
+2. Cole as partes
+3. Clique em **Commit changes**
 
-Depois escaneie o QR Code no Expo Go.
 
----
-
-## 📌 Status do projeto
-
-✔ Funcional no mobile  
-✔ Em desenvolvimento contínuo  
-✔ Foco educacional (estudo de mapas e rotas)
-
----
-
-## 👨‍💻 Autor
-
-Desenvolvido por Marcos De Lima
