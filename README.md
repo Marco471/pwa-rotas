@@ -2,6 +2,8 @@
 
 
 
+
+
 # 📍 PWA Rotas
 
 Aplicativo mobile de rotas com mapa, GPS e navegação em tempo real, desenvolvido com **Expo React Native**.
