@@ -33,7 +33,7 @@ Este projeto foi criado para praticar integração com mapas, GPS e manipulaçã
 
 ## 📸 Demonstração
 
-[![Assistir demonstração](./assets/images/print1-rota.png)](https://github.com/Marco471/pwa-rotas/raw/main/WhatsAppVideo2026-05-11at23.17.02-ezgif.com-video-to-gif-converter.mp4)
+[![Assistir demonstração](./assets/images/icon.png)](https://github.com/Marco471/pwa-rotas/raw/main/WhatsAppVideo2026-05-11at23.17.02-ezgif.com-video-to-gif-converter.mp4)
 
 ---
 
